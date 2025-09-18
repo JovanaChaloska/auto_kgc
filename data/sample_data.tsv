@@ -1,0 +1,13 @@
+id	sentence	context	domain
+1	The cat is sitting on the mat.	pet_behavior	animals
+2	John works at Microsoft.	employment	business
+3	The book was written by Shakespeare.	literature	arts
+4	The sun rises in the east.	geography	geography
+5	Water boils at 100 degrees Celsius.	science	physics
+6	Tim Cook is the CEO of Apple.	business	technology
+7	The iPhone is manufactured by Apple.	product	technology
+8	Paris is the capital of France.	geography	geography
+9	The Earth orbits around the sun.	astronomy	science
+10	Shakespeare was born in Stratford-upon-Avon.	biography	literature
+
+
