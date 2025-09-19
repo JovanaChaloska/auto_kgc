@@ -1,6 +1,6 @@
-import numpy as np
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
+# import numpy as np
+# from sentence_transformers import SentenceTransformer
+# from sklearn.metrics.pairwise import cosine_similarity
 
 class EmbeddingCanonicalizer:
     def __init__(self, 
@@ -11,13 +11,13 @@ class EmbeddingCanonicalizer:
         
         self.embedding_model = None
         
-        self._setup_embedding_model()
+        # self._setup_embedding_model()
     
-    def _setup_embedding_model(self):
-        try:
-            print(f"Loading embedding model: {self.embedding_model_name}")
-            self.embedding_model = SentenceTransformer(self.embedding_model_name)
-            print("Embedding model loaded successfully")
-        except Exception as e:
-            print(f"Error loading embedding model: {e}")
-            raise
+    # def _setup_embedding_model(self):
+    #     try:
+    #         print(f"Loading embedding model: {self.embedding_model_name}")
+    #         self.embedding_model = SentenceTransformer(self.embedding_model_name)
+    #         print("Embedding model loaded successfully")
+    #     except Exception as e:
+    #         print(f"Error loading embedding model: {e}")
+    #         raise

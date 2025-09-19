@@ -19,16 +19,18 @@ class KnowledgeGraphPipeline:
         print("Knowledge Graph Pipeline initialized")
     
     def run_pipeline(self, 
-                    input_path: str, 
                     output_dir: Optional[str] = "results.json") -> Dict[str, Any]:
         try:
             print("Step 1: Loading data")
-            data = pd.read_csv(input_path, header=None, names=["id", "sentence"])
+            # data = pd.read_csv(input_path, header=None, names=["id", "sentence"])
+            data=self.data
+
+            print(data.head())
 
             print("Step 2: Extracting triplets")
             triplets = self.triplet_extractor.extract_batch(
                 data, 
-                batch_size=self.config.get("batch_size", 4)
+                batch_size=10
             )
             
             triplets.to_excel("results.xlsx", index=False)

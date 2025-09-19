@@ -1,9 +1,10 @@
 from typing import List, Dict, Any, Optional, Tuple
 import re
 import pandas as pd
+import json
 
-from llama_inference import LlamaInference
-from prompts import triplets_extraction_prompt
+from .llama_inference import LlamaInference
+from .prompts import triplets_extraction_prompt
 
 
 class LLamaTripletExtractor:
@@ -17,12 +18,15 @@ class LLamaTripletExtractor:
             so it returns the last occurence of list of triplet tuples in the string"""
         clean_text = generated_text.replace("\n", "")
 
-        pattern = r"\[\s*(\(\s*[^();]+\s*(?:;\s*[^();]+\s*)+\))(?:\s*,\s*\(\s*[^();]+\s*(?:;\s*[^();]+\s*)+\))\s\]"
+        pattern = r"\[\s*(\(\s*[^();]+\s*(?:;\s*[^();]+\s*)+\))(?:\s*,\s*\(\s*[^();]+\s*(?:;\s*[^();]+\s*)+\))*\s*\]"
 
         matches = re.findall(pattern, clean_text)
         matches = [m.group(0) for m in re.finditer(pattern, clean_text)]
         
-        return matches[-1]
+        if matches:
+            return matches[-1]
+        else:
+            return "[]"
     
     def extract_triplets(self, 
                         sentence: str, 
@@ -45,6 +49,8 @@ class LLamaTripletExtractor:
         df = df.copy()
         df["sentence_length"] = df["sentence"].str.len()
         df = df.sort_values("sentence_length").reset_index(drop=True)
+
+        print(df.head())
 
         all_triplets = []
         i=0
@@ -73,12 +79,14 @@ class LLamaTripletExtractor:
                     j += 1
 
                 batch_df = pd.DataFrame(batch)
-
                 sentences = batch_df["sentence"].tolist()
+                sentences = [self.prompt.format(sentence=item) for item in sentences]
                 triplets = self.llama_extractor.generate_batch(sentences)
                 triplets = [self._parse_triplets(item) for item in triplets]
-
                 all_triplets.extend(triplets)
+                tmp_dict = {'triplets': all_triplets}
+                with open('triplets.json', "w") as f:
+                    json.dump(tmp_dict, f, indent=2)
 
                 print(f"Processed batch {len(all_triplets)}/{len(df)} sentences")
                 i = j if j > i else i + 1

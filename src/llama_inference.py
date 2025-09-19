@@ -1,3 +1,5 @@
+
+
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from transformers import logging
@@ -6,7 +8,7 @@ from typing import Optional
 
 
 class LlamaInference:
-    def _init_(self, model_name: str = "meta-llama/Llama-3.2-1B-Instruct", 
+    def __init__(self, model_name: str = "meta-llama/Llama-3.2-1B-Instruct", 
                  device: Optional[str] = None, 
                  torch_dtype: torch.dtype = torch.float16):
         self.model_name = model_name
@@ -27,6 +29,11 @@ class LlamaInference:
                 self.model_name,
                 trust_remote_code=True
             )
+
+            if self.tokenizer.pad_token is None:
+                self.tokenizer.pad_token = self.tokenizer.eos_token
+
+            self.tokenizer.padding_side = "left"
             
             print("Loading model...")
             self.model = AutoModelForCausalLM.from_pretrained(
@@ -59,11 +66,20 @@ class LlamaInference:
             raise RuntimeError("Model not loaded. Initialize the class first.")
         
         try:
-            inputs = self.tokenizer.encode(input_text, return_tensors="pt").to(self.device)
+            #tokenizer(...) instead of encode() to also get attention_mask
+            inputs = self.tokenizer(
+                input_text,
+                return_tensors="pt",
+                padding=True,
+                truncation=True
+            )
+
+            #move inputs (both input_ids and attention_mask) to device
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
             
             with torch.no_grad():
                 outputs = self.model.generate(
-                    inputs,
+                    **inputs, #** to unpack the inputs and attention mask
                     max_length=max_length,
                     temperature=temperature,
                     top_p=top_p,
@@ -96,7 +112,7 @@ class LlamaInference:
     ) -> list[str]:
         if self.model is None or self.tokenizer is None:
             raise RuntimeError("Model not loaded. Initialize the class first.")
-        
+        print('enter ll')
         try:
             inputs = self.tokenizer(
                 input_texts,
