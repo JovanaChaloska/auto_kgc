@@ -12,17 +12,75 @@ class LLamaTripletExtractor:
         self.llama_extractor = LlamaInference()
         self.prompt = triplets_extraction_prompt
     
-    def _parse_triplets(self, generated_text: str) -> List[Tuple[str, str, str]]:
-        """Llama returns the entire system prompt that also contains list of triplets in the examples plus the resul.
-            can't split the string on 'assistant' cause it might be included in the result entities
-            so it returns the last occurence of list of triplet tuples in the string"""
-        clean_text = generated_text.replace("\n", "")
+    # def _parse_triplets(self, generated_text: str) -> List[Tuple[str, str, str]]:
+    #     """Llama returns the entire system prompt that also contains list of triplets in the examples plus the resul.
+    #         can't split the string on 'assistant' cause it might be included in the result entities
+    #         so it returns the last occurence of list of triplet tuples in the string"""
+    #     clean_text = generated_text.replace("\n", "")
 
-        pattern = r"\[\s*(\(\s*[^();]+\s*(?:;\s*[^();]+\s*)+\))(?:\s*,\s*\(\s*[^();]+\s*(?:;\s*[^();]+\s*)+\))*\s*\]"
+    #     pattern = r"\[\s*(\(\s*[^();]+\s*(?:;\s*[^();]+\s*)+\))(?:\s*,\s*\(\s*[^();]+\s*(?:;\s*[^();]+\s*)+\))*\s*\]"
 
-        matches = re.findall(pattern, clean_text)
-        matches = [m.group(0) for m in re.finditer(pattern, clean_text)]
+    #     matches = re.findall(pattern, clean_text)
+    #     matches = [m.group(0) for m in re.finditer(pattern, clean_text)]
         
+    #     if matches:
+    #         return matches[-1]
+    #     else:
+    #         return "[]"
+        
+    def _extract_structures(self, text: str):
+        """Extracts all top-level [ ... ] blocks from text."""
+        results = []
+        i = 0
+        while i < len(text):
+            if text[i] == "[":
+                depth = 1
+                j = i + 1
+                while j < len(text) and depth > 0:
+                    if text[j] == "[":
+                        depth += 1
+                    elif text[j] == "]":
+                        depth -= 1
+                    j += 1
+                if depth == 0:  # found matching ]
+                    results.append(text[i:j])
+                    i = j
+                    continue
+            i += 1
+        return results
+
+
+    def _parse_block(self, block: str):
+        """Extracts all top-level ( ... ) tuples inside a [ ... ] block."""
+        assert block[0] == "[" and block[-1] == "]"
+        inner = block[1:-1].strip()
+        tuples = []
+        i = 0
+        while i < len(inner):
+            if inner[i] == "(":
+                depth = 1
+                j = i + 1
+                while j < len(inner) and depth > 0:
+                    if inner[j] == "(":
+                        depth += 1
+                    elif inner[j] == ")":
+                        depth -= 1
+                    j += 1
+                tuples.append(inner[i:j])
+                i = j
+                continue
+            i += 1
+        return tuples
+
+
+    def _parse_triplets(self, generated_text: str):
+        """Replacement for the regex-based function: finds all [ ... ] blocks and extracts full matches."""
+        clean_text = generated_text.replace("\n", "")
+        matches = []
+        for block in self._extract_structures(clean_text):
+            tuples = self._parse_block(block)
+            if tuples:  # only keep if it matches the expected ( ... ) pattern
+                matches.append(block)  # mimic regex: return full [ ... ] match
         if matches:
             return matches[-1]
         else:
@@ -46,11 +104,11 @@ class LLamaTripletExtractor:
     def extract_batch(self, 
                      df: pd.DataFrame, 
                      batch_size: int = 4) -> pd.DataFrame:
-        df = df.copy()
-        df["sentence_length"] = df["sentence"].str.len()
-        df = df.sort_values("sentence_length").reset_index(drop=True)
+        df_local = df.copy()
+        df_local["sentence_length"] = df_local["sentence"].str.len()
+        df_local = df_local.sort_values("sentence_length").reset_index(drop=True)
 
-        print(df.head())
+        print(df_local.head())
 
         all_triplets = []
         i=0
@@ -66,16 +124,16 @@ class LLamaTripletExtractor:
 
         #dynamic batches per sentence length
         try:
-            while i < len(df):
-                batch = [df.iloc[i]]
-                base_len = df.iloc[i]["sentence_length"]
+            while i < len(df_local):
+                batch = [df_local.iloc[i]]
+                base_len = df_local.iloc[i]["sentence_length"]
                 j = i + 1
 
-                while j < len(df) and len(batch) < batch_size:
-                    next_len = df.iloc[j]["sentence_length"]
+                while j < len(df_local) and len(batch) < batch_size:
+                    next_len = df_local.iloc[j]["sentence_length"]
                     if next_len - base_len > 15:   # stop condition
                         break
-                    batch.append(df.iloc[j])
+                    batch.append(df_local.iloc[j])
                     j += 1
 
                 batch_df = pd.DataFrame(batch)
@@ -88,16 +146,16 @@ class LLamaTripletExtractor:
                 with open('triplets.json', "w") as f:
                     json.dump(tmp_dict, f, indent=2)
 
-                print(f"Processed batch {len(all_triplets)}/{len(df)} sentences")
+                print(f"Processed batch {len(all_triplets)}/{len(df_local)} sentences")
                 i = j if j > i else i + 1
-            
-            df.drop(columns="sentence_length", inplace=True)
-            df["triplets"] = all_triplets
+
+            df_local["triplets"] = all_triplets
         
-            return df
-        finally:
-            progress_df = df.iloc[:len(all_triplets)].copy()
-            progress_df.drop(columns="sentence_length", inplace=True)
+            return df_local
+        except Exception as e:
+            print(f'failed with {e}')
+            progress_df = df_local.iloc[:len(all_triplets)].copy()
+            progress_df.drop(columns="sentence_length", axis=1, inplace=True)
             progress_df["triplets"] = all_triplets
 
             progress_df.to_excel("partial_results.xlsx", index=False)
