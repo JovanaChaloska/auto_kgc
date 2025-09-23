@@ -1,5 +1,8 @@
 *.ipynb
 run_pipeline.py
+*.xlsx
+*.json
+*.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
